@@ -1,0 +1,26 @@
+{
+  "include": [
+    "."
+  ],
+  "exclude": [
+    "venv",
+    "__pycache__",
+    "alembic/versions",
+    "data"
+  ],
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "reportUnusedImport": "warning",
+  "reportUnusedVariable": "warning",
+  "reportUnusedFunction": "warning",
+  "reportGeneralTypeIssues": true,
+  "reportOptionalMemberAccess": "warning",
+  "reportOptionalSubscript": "warning",
+  "reportPrivateUsage": "warning",
+  "pythonVersion": "3.9",
+  "pythonPlatform": "Darwin",
+  "typeCheckingMode": "basic",
+  "useLibraryCodeForTypes": true,
+  "reportUnnecessaryTypeIgnoreComment": "warning",
+  "reportCoroutineNotAwaited": "error"
+}

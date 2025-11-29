@@ -50,35 +50,42 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      <div className="absolute top-4 right-4">
+    <div className="min-h-screen gradient-bg grid-pattern noise-texture">
+      <div className="absolute top-6 right-6 z-50">
         <ThemeToggle />
       </div>
 
-      <main className="container mx-auto px-4 py-16">
+      <main className="container mx-auto px-6 py-20 relative">
         {/* Hero Section */}
-        <div className="text-center mb-16 space-y-6">
-          <h1 className="text-5xl md:text-6xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Take Back Your Inbox
-          </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto">
-            Let our autonomous AI agent declutter your Gmail inbox by intelligently removing unwanted emails while keeping what matters.
+        <div className="text-center mb-24 space-y-8 hero-glow">
+          <div className="space-y-4 animate-fade-in-up">
+            <h1 className="text-7xl md:text-8xl lg:text-9xl font-black tracking-tight gradient-text leading-none">
+              INBOX NUKE
+            </h1>
+            <p className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground/90 max-w-3xl mx-auto leading-tight">
+              Obliterate inbox chaos with autonomous AI cleanup
+            </p>
+          </div>
+
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed animate-fade-in-up animate-delay-100">
+            Fully local agent that intelligently removes unwanted emails while keeping what matters. Zero cloud storage, maximum privacy.
           </p>
-          <div className="pt-4">
+
+          <div className="pt-6 animate-fade-in-up animate-delay-200">
             {isChecking ? (
               <Button
                 size="lg"
                 disabled
-                className="text-lg px-8 py-6"
+                className="text-lg px-10 py-7 font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300"
               >
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
                 Checking status...
               </Button>
             ) : isAuthenticated ? (
               <Button
                 size="lg"
                 onClick={handleGoToDashboard}
-                className="text-lg px-8 py-6"
+                className="text-lg px-10 py-7 font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:scale-105 transition-all duration-300"
               >
                 Go to Dashboard
               </Button>
@@ -87,60 +94,69 @@ export default function Home() {
                 size="lg"
                 onClick={handleConnectGmail}
                 disabled={isConnecting}
-                className="text-lg px-8 py-6"
+                className="text-lg px-10 py-7 font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:scale-105 transition-all duration-300"
               >
-                {isConnecting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                {isConnecting && <Loader2 className="mr-2 h-6 w-6 animate-spin" />}
                 Connect Gmail
               </Button>
             )}
           </div>
+
           {error && (
-            <p className="mt-4 text-destructive text-sm">{error}</p>
+            <p className="mt-4 text-destructive text-sm font-medium animate-fade-in">{error}</p>
           )}
         </div>
 
         {/* Feature Cards */}
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          <Card className="border-2 hover:border-primary/50 transition-colors">
-            <CardHeader>
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                <Shield className="w-6 h-6 text-primary" />
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <Card className="card-glow border-2 border-border/50 backdrop-blur-sm bg-card/50 animate-scale-in">
+            <CardHeader className="space-y-4">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center ring-2 ring-primary/20">
+                <Shield className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle>100% Local</CardTitle>
-              <CardDescription>
-                Your data stays on your machine. We never store or transmit your emails to our servers.
-              </CardDescription>
+              <CardTitle className="text-2xl font-bold">100% Local</CardTitle>
             </CardHeader>
+            <CardContent>
+              <CardDescription className="text-base leading-relaxed">
+                Your data stays on your machine. We never store or transmit your emails to our servers. Complete privacy guaranteed.
+              </CardDescription>
+            </CardContent>
           </Card>
 
-          <Card className="border-2 hover:border-primary/50 transition-colors">
-            <CardHeader>
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                <Zap className="w-6 h-6 text-primary" />
+          <Card className="card-glow border-2 border-border/50 backdrop-blur-sm bg-card/50 animate-scale-in animate-delay-100">
+            <CardHeader className="space-y-4">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center ring-2 ring-accent/20">
+                <Zap className="w-8 h-8 text-accent" />
               </div>
-              <CardTitle>Fully Autonomous</CardTitle>
-              <CardDescription>
-                Our AI agent makes intelligent decisions about what to keep and what to delete, learning from your preferences.
-              </CardDescription>
+              <CardTitle className="text-2xl font-bold">Fully Autonomous</CardTitle>
             </CardHeader>
+            <CardContent>
+              <CardDescription className="text-base leading-relaxed">
+                AI agent makes intelligent decisions about what to keep and delete. Unsubscribes, filters, and cleans automatically.
+              </CardDescription>
+            </CardContent>
           </Card>
 
-          <Card className="border-2 hover:border-primary/50 transition-colors">
-            <CardHeader>
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                <BarChart3 className="w-6 h-6 text-primary" />
+          <Card className="card-glow border-2 border-border/50 backdrop-blur-sm bg-card/50 animate-scale-in animate-delay-200">
+            <CardHeader className="space-y-4">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-success/20 to-success/5 flex items-center justify-center ring-2 ring-success/20">
+                <BarChart3 className="w-8 h-8 text-success" />
               </div>
-              <CardTitle>Real-time Progress</CardTitle>
-              <CardDescription>
-                Watch as your inbox gets cleaned with live updates on emails processed, deleted, and space reclaimed.
-              </CardDescription>
+              <CardTitle className="text-2xl font-bold">Real-time Progress</CardTitle>
             </CardHeader>
+            <CardContent>
+              <CardDescription className="text-base leading-relaxed">
+                Watch live updates on emails processed, deleted, and space reclaimed. Full transparency in every action taken.
+              </CardDescription>
+            </CardContent>
           </Card>
         </div>
 
-        {/* Additional Info */}
-        <div className="text-center mt-16 text-sm text-muted-foreground">
-          <p>Powered by advanced AI technology to keep your inbox clean and organized</p>
+        {/* Tech Stack Badge */}
+        <div className="text-center mt-24 animate-fade-in animate-delay-300">
+          <p className="text-sm font-mono text-muted-foreground tracking-wider uppercase">
+            Powered by FastAPI + Next.js + OpenAI
+          </p>
         </div>
       </main>
     </div>

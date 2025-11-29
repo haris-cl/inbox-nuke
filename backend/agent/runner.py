@@ -26,6 +26,7 @@ from agent.discovery import discover_senders as discovery_discover_senders
 from agent.unsubscribe import unsubscribe as agent_unsubscribe
 from agent.filters import create_mute_filter as agent_create_mute_filter
 from agent.cleanup import delete_emails_from_sender as agent_delete_emails
+from agent.retention import RetentionEngine, Action
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,7 @@ class CleanupAgent:
         self.gmail_client: Optional[GmailClient] = None
         self.run: Optional[CleanupRun] = None
         self._should_stop = False
+        self.retention_engine = RetentionEngine()  # Initialize retention engine
 
     async def initialize(self) -> None:
         """
@@ -370,11 +372,12 @@ class CleanupAgent:
 
         Workflow:
         1. Run safety check
-        2. If safe:
+        2. Apply retention rules to determine action
+        3. If safe to process:
            a. Attempt unsubscribe
            b. Create mute filter
-           c. Delete old emails
-        3. Return result
+           c. Delete old emails (respecting retention rules)
+        4. Return result
 
         Args:
             sender: Sender instance to process
@@ -384,7 +387,7 @@ class CleanupAgent:
         """
         logger.debug(f"Processing sender: {sender.email}")
 
-        # Step 1: Safety check
+        # Step 1: Safety check (highest priority)
         safety_result = await check_sender_safety(sender.email, self.db)
 
         if not safety_result.is_safe:
@@ -396,7 +399,35 @@ class CleanupAgent:
                 notes=f"Protected: {safety_result.reason}"
             )
 
-        # Step 2: Attempt unsubscribe
+        # Step 2: Check retention rules for this sender
+        # Build email data for retention evaluation
+        email_data = {
+            "sender_email": sender.email,
+            "sender_domain": sender.domain,
+            "subject": "",  # We'll check individual emails later
+            "labels": [],
+            "has_attachment": False,
+            "is_conversation": False,
+            "category": "",
+            "date": datetime.utcnow(),
+        }
+
+        # Evaluate sender-level rules (domain, sender email)
+        retention_result = self.retention_engine.evaluate(email_data)
+
+        # If retention rules say KEEP at sender level, skip processing
+        if retention_result.action == Action.KEEP:
+            logger.info(
+                f"Skipping sender {sender.email} due to retention rule: {retention_result.matching_rule}"
+            )
+            return ActionResult(
+                action_type="skip",
+                sender_email=sender.email,
+                success=True,
+                notes=f"Retention rule: {retention_result.matching_rule}"
+            )
+
+        # Step 3: Attempt unsubscribe
         unsubscribe_success = False
         if sender.has_list_unsubscribe and not sender.unsubscribed:
             try:
@@ -407,7 +438,7 @@ class CleanupAgent:
             except Exception as e:
                 logger.warning(f"Unsubscribe failed for {sender.email}: {e}")
 
-        # Step 3: Create mute filter
+        # Step 4: Create mute filter
         filter_success = False
         if not sender.filter_created:
             try:
@@ -417,11 +448,11 @@ class CleanupAgent:
             except Exception as e:
                 logger.warning(f"Filter creation failed for {sender.email}: {e}")
 
-        # Step 4: Delete old emails
+        # Step 5: Delete old emails (with conversation protection)
         emails_deleted = 0
         bytes_freed = 0
         try:
-            emails_deleted, bytes_freed = await self._delete_emails_from_sender(sender)
+            emails_deleted, bytes_freed = await self._delete_emails_from_sender_with_retention(sender)
         except Exception as e:
             logger.error(f"Email deletion failed for {sender.email}: {e}")
 
@@ -550,6 +581,119 @@ class CleanupAgent:
 
         except Exception as e:
             logger.error(f"Failed to delete emails from {sender.email}: {e}")
+            return 0, 0
+
+    async def _delete_emails_from_sender_with_retention(self, sender: Sender) -> tuple[int, int]:
+        """
+        Delete emails from sender with retention rule checking.
+
+        This method checks each email individually against retention rules,
+        including conversation thread detection. Emails that match KEEP rules
+        are preserved.
+
+        Args:
+            sender: Sender instance
+
+        Returns:
+            Tuple of (emails_deleted, bytes_freed)
+        """
+        logger.debug(f"Deleting emails from {sender.email} with retention checks")
+
+        try:
+            from agent.safety import is_junk_sender
+
+            # Determine age threshold
+            if is_junk_sender(sender.email) or sender.has_list_unsubscribe:
+                older_than_days = 7
+            else:
+                older_than_days = 30
+
+            # Get emails from this sender with thread info
+            query = f"from:{sender.email}"
+            emails = await self.gmail_client.get_emails_with_thread_info(
+                query=query,
+                max_results=500,  # Process in batches
+            )
+
+            # Filter emails by age and retention rules
+            emails_to_delete = []
+            total_bytes = 0
+            kept_count = 0
+
+            cutoff_date = datetime.utcnow() - timedelta(days=older_than_days)
+
+            for email_msg in emails:
+                try:
+                    # Get full message details
+                    message = await self.gmail_client.get_message(
+                        email_msg["id"],
+                        format="metadata"
+                    )
+
+                    # Check if it's a conversation (HIGHEST PRIORITY)
+                    is_conversation = email_msg.get("is_conversation", False)
+                    if is_conversation:
+                        logger.debug(f"Keeping conversation email {email_msg['id']}")
+                        kept_count += 1
+                        continue
+
+                    # Extract headers for retention evaluation
+                    headers = message.get("payload", {}).get("headers", [])
+                    subject = ""
+                    date_str = ""
+                    for header in headers:
+                        if header.get("name", "").lower() == "subject":
+                            subject = header.get("value", "")
+                        elif header.get("name", "").lower() == "date":
+                            date_str = header.get("value", "")
+
+                    # Build email data for retention evaluation
+                    email_data = {
+                        "sender_email": sender.email,
+                        "sender_domain": sender.domain,
+                        "subject": subject,
+                        "labels": message.get("labelIds", []),
+                        "has_attachment": len(message.get("payload", {}).get("parts", [])) > 1,
+                        "is_conversation": is_conversation,
+                        "category": "",  # TODO: Extract from labels
+                        "date": cutoff_date,  # For older_than_days rules
+                    }
+
+                    # Evaluate retention rules
+                    retention_result = self.retention_engine.evaluate(email_data)
+
+                    # Keep emails that match KEEP rules
+                    if retention_result.action == Action.KEEP:
+                        logger.debug(
+                            f"Keeping email {email_msg['id']} due to rule: {retention_result.matching_rule}"
+                        )
+                        kept_count += 1
+                        continue
+
+                    # Add to delete list if passes all checks
+                    emails_to_delete.append(email_msg["id"])
+                    total_bytes += self.gmail_client.get_message_size(message)
+
+                except Exception as e:
+                    logger.warning(f"Error evaluating email {email_msg.get('id')}: {e}")
+                    # When in doubt, keep the email (safe side)
+                    kept_count += 1
+                    continue
+
+            # Delete the filtered emails
+            if emails_to_delete:
+                deleted_count = await self.gmail_client.trash_messages(emails_to_delete)
+                logger.info(
+                    f"Deleted {deleted_count}/{len(emails)} emails from {sender.email} "
+                    f"({total_bytes / (1024*1024):.2f} MB freed, {kept_count} kept by retention rules)"
+                )
+                return deleted_count, total_bytes
+            else:
+                logger.info(f"No emails to delete from {sender.email} (all protected by retention rules)")
+                return 0, 0
+
+        except Exception as e:
+            logger.error(f"Failed to delete emails from {sender.email} with retention: {e}")
             return 0, 0
 
     async def _log_action(self, result: ActionResult) -> None:

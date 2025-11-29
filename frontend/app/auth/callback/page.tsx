@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default function AuthCallback() {
+function AuthCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [countdown, setCountdown] = useState(2)
@@ -41,61 +41,80 @@ export default function AuthCallback() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full">
-        <CardHeader className="text-center">
-          {success ? (
-            <>
-              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-success/10 flex items-center justify-center">
-                <CheckCircle2 className="w-8 h-8 text-success" />
-              </div>
-              <CardTitle className="text-2xl">Successfully Connected!</CardTitle>
-              <CardDescription className="text-base mt-2">
-                Your Gmail account has been connected successfully.
-                {email && (
-                  <span className="block mt-1 font-medium text-foreground">
-                    {email}
-                  </span>
-                )}
-              </CardDescription>
-            </>
-          ) : (
-            <>
-              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-                <XCircle className="w-8 h-8 text-destructive" />
-              </div>
-              <CardTitle className="text-2xl">Connection Failed</CardTitle>
-              <CardDescription className="text-base mt-2">
-                {error || "An error occurred while connecting your Gmail account. Please try again."}
-              </CardDescription>
-            </>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {success ? (
-            <>
-              <p className="text-sm text-muted-foreground text-center">
-                Redirecting to dashboard in {countdown} seconds...
-              </p>
-              <Button
-                onClick={handleGoToDashboard}
-                className="w-full"
-                size="lg"
-              >
-                Go to Dashboard Now
-              </Button>
-            </>
-          ) : (
+    <Card className="max-w-md w-full">
+      <CardHeader className="text-center">
+        {success ? (
+          <>
+            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-success/10 flex items-center justify-center">
+              <CheckCircle2 className="w-8 h-8 text-success" />
+            </div>
+            <CardTitle className="text-2xl">Successfully Connected!</CardTitle>
+            <CardDescription className="text-base mt-2">
+              Your Gmail account has been connected successfully.
+              {email && (
+                <span className="block mt-1 font-medium text-foreground">
+                  {email}
+                </span>
+              )}
+            </CardDescription>
+          </>
+        ) : (
+          <>
+            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+              <XCircle className="w-8 h-8 text-destructive" />
+            </div>
+            <CardTitle className="text-2xl">Connection Failed</CardTitle>
+            <CardDescription className="text-base mt-2">
+              {error || "An error occurred while connecting your Gmail account. Please try again."}
+            </CardDescription>
+          </>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {success ? (
+          <>
+            <p className="text-sm text-muted-foreground text-center">
+              Redirecting to dashboard in {countdown} seconds...
+            </p>
             <Button
-              onClick={handleTryAgain}
+              onClick={handleGoToDashboard}
               className="w-full"
               size="lg"
             >
-              Try Again
+              Go to Dashboard Now
             </Button>
-          )}
-        </CardContent>
-      </Card>
+          </>
+        ) : (
+          <Button
+            onClick={handleTryAgain}
+            className="w-full"
+            size="lg"
+          >
+            Try Again
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <Card className="max-w-md w-full">
+      <CardContent className="py-8 flex flex-col items-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading...</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function AuthCallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 flex items-center justify-center p-4">
+      <Suspense fallback={<LoadingFallback />}>
+        <AuthCallbackContent />
+      </Suspense>
     </div>
   )
 }

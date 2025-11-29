@@ -6,10 +6,29 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "generate-types": "cd .. && python scripts/generate-types.py",
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:mobile": "playwright test --project=mobile-chrome --project=mobile-safari",
+    "test:dashboard": "playwright test dashboard.spec.ts",
+    "test:cleanup": "playwright test cleanup-wizard.spec.ts",
+    "test:navigation": "playwright test navigation.spec.ts",
+    "test:space": "playwright test space-manager.spec.ts",
+    "test:history": "playwright test history.spec.ts",
+    "test:settings": "playwright test settings.spec.ts",
+    "test:auth": "playwright test home-and-auth.spec.ts",
+    "test:report": "playwright show-report"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
+    "@radix-ui/react-tabs": "^1.1.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "lucide-react": "^0.312.0",
@@ -22,6 +41,7 @@
     "tailwind-merge": "^2.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.40.0",
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

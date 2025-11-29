@@ -65,7 +65,18 @@ async def init_db() -> None:
         print(f"Created data directory: {data_dir}")
 
     # Import all models to ensure they are registered
-    from models import GmailCredentials, CleanupRun, Sender, CleanupAction, WhitelistDomain
+    from models import (
+        GmailCredentials,
+        CleanupRun,
+        Sender,
+        CleanupAction,
+        WhitelistDomain,
+        EmailClassification,
+        RetentionRule,
+        Subscription,
+        SenderProfile,
+        EmailScore
+    )
 
     # Create all tables
     async with engine.begin() as conn:

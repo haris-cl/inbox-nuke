@@ -1,104 +1,30 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import useSWR from "swr"
-import { Trash2, Database, Mail, Filter } from "lucide-react"
+import { Trash2, Database, Mail, Filter, BarChart3, Shield, AlertCircle, TrendingUp, Clock, HardDrive, History } from "lucide-react"
 import { StatCard } from "@/components/stat-card"
-import { ControlPanel } from "@/components/control-panel"
-import { ProgressSection } from "@/components/progress-section"
-import { ActivityFeed } from "@/components/activity-feed"
-import { api, Stats, Run, RunAction } from "@/lib/api"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { api, Stats, Run, RunAction, ScoringStats } from "@/lib/api"
+import { InboxHealthCard } from "./components/inbox-health-card"
+import Link from "next/link"
 
 export default function DashboardPage() {
-  const [currentRun, setCurrentRun] = useState<Run | null>(null)
+  const router = useRouter()
   const [actions, setActions] = useState<RunAction[]>([])
-  const [isOperating, setIsOperating] = useState(false)
 
   // Fetch current stats
-  const { data: stats, mutate: mutateStats } = useSWR<Stats>(
+  const { data: stats } = useSWR<Stats>(
     "/api/stats/current",
     () => api.getCurrentStats(),
-    {
-      refreshInterval: currentRun?.status === "running" ? 2000 : 0,
-    }
+    { refreshInterval: 0 }
   )
 
-  // Fetch run actions when a run is active
-  useEffect(() => {
-    if (currentRun?.id) {
-      loadActions()
-      const interval = setInterval(loadActions, 2000)
-      return () => clearInterval(interval)
-    }
-  }, [currentRun?.id])
-
-  const loadActions = async () => {
-    if (!currentRun?.id) return
-    try {
-      const fetchedActions = await api.getRunActions(currentRun.id, { limit: 20, offset: 0 })
-      setActions(fetchedActions)
-    } catch (error) {
-      console.error("Failed to load actions:", error)
-    }
-  }
-
-  const handleStart = async () => {
-    try {
-      setIsOperating(true)
-      const run = await api.startRun()
-      setCurrentRun(run)
-      mutateStats()
-    } catch (error) {
-      console.error("Failed to start run:", error)
-      alert("Failed to start cleanup. Please try again.")
-    } finally {
-      setIsOperating(false)
-    }
-  }
-
-  const handlePause = async () => {
-    if (!currentRun?.id) return
-    try {
-      setIsOperating(true)
-      const run = await api.pauseRun(currentRun.id)
-      setCurrentRun(run)
-      mutateStats()
-    } catch (error) {
-      console.error("Failed to pause run:", error)
-      alert("Failed to pause cleanup. Please try again.")
-    } finally {
-      setIsOperating(false)
-    }
-  }
-
-  const handleResume = async () => {
-    if (!currentRun?.id) return
-    try {
-      setIsOperating(true)
-      const run = await api.resumeRun(currentRun.id)
-      setCurrentRun(run)
-      mutateStats()
-    } catch (error) {
-      console.error("Failed to resume run:", error)
-      alert("Failed to resume cleanup. Please try again.")
-    } finally {
-      setIsOperating(false)
-    }
-  }
-
-  const handleCancel = async () => {
-    if (!currentRun?.id) return
-    try {
-      setIsOperating(true)
-      const run = await api.cancelRun(currentRun.id)
-      setCurrentRun(run)
-      mutateStats()
-    } catch (error) {
-      console.error("Failed to cancel run:", error)
-      alert("Failed to cancel cleanup. Please try again.")
-    } finally {
-      setIsOperating(false)
-    }
+  // Convert bytes to MB for display
+  const bytesToMB = (bytes: number): number => {
+    return Math.round(bytes / (1024 * 1024))
   }
 
   const formatBytes = (bytes: number): string => {
@@ -109,77 +35,135 @@ export default function DashboardPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
-  // Use active_run from stats if no currentRun is set
-  const activeRun = currentRun || stats?.active_run
-  const runStatus = (activeRun?.status || "idle") as "idle" | "pending" | "running" | "paused" | "completed" | "failed" | "cancelled"
-  const isRunActive = runStatus === "running" || runStatus === "paused"
-
-  // Calculate progress from active_run if available
-  const progress = stats?.active_run?.senders_total
-    ? Math.round((stats.active_run.senders_processed / stats.active_run.senders_total) * 100)
-    : 0
+  const formatDate = (dateStr?: string): string => {
+    if (!dateStr) return "Never"
+    const date = new Date(dateStr)
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Monitor your inbox cleanup progress and statistics
+    <div className="space-y-8 animate-fade-in">
+      {/* Header */}
+      <div className="space-y-2">
+        <h1 className="text-5xl font-black tracking-tight gradient-text">Dashboard</h1>
+        <p className="text-muted-foreground text-lg">
+          Your inbox at a glance
         </p>
       </div>
 
-      {/* Control Panel */}
-      <ControlPanel
-        status={runStatus}
-        onStart={handleStart}
-        onPause={handlePause}
-        onResume={handleResume}
-        onCancel={handleCancel}
-        disabled={isOperating}
-      />
+      {/* V2 Inbox Health Card - Primary CTA */}
+      <div className="animate-fade-in-up animate-delay-100">
+        <InboxHealthCard />
+      </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Lifetime Stats */}
+      <div className="grid gap-6 md:grid-cols-4 animate-fade-in-up animate-delay-200">
         <StatCard
           icon={Trash2}
-          label="Emails Deleted"
-          value={stats?.active_run?.emails_deleted || stats?.total_emails_deleted || 0}
+          label="Emails Cleaned"
+          value={stats?.total_emails_deleted || 0}
           variant="destructive"
         />
         <StatCard
-          icon={Database}
-          label="Storage Freed"
-          value={stats?.active_run?.bytes_freed_estimate || stats?.total_bytes_freed || 0}
+          icon={HardDrive}
+          label="Space Freed"
+          value={bytesToMB(stats?.total_bytes_freed || 0)}
+          suffix=" MB"
           variant="success"
-          suffix={` ${formatBytes(stats?.active_run?.bytes_freed_estimate || stats?.total_bytes_freed || 0)}`}
-          decimals={0}
         />
         <StatCard
           icon={Mail}
-          label="Senders Processed"
-          value={stats?.active_run?.senders_processed || 0}
+          label="Senders Analyzed"
+          value={stats?.total_senders || 0}
           variant="default"
         />
         <StatCard
-          icon={Filter}
-          label="Total Senders"
-          value={stats?.active_run?.senders_total || stats?.total_senders || 0}
+          icon={History}
+          label="Total Cleanups"
+          value={stats?.total_runs || 0}
           variant="default"
         />
       </div>
 
-      {/* Progress Section - Only shown when run is active */}
-      {isRunActive && stats?.active_run && (
-        <ProgressSection
-          percent={progress}
-          phase={runStatus === "paused" ? "Paused" : "Processing"}
-          current={stats.active_run.senders_processed}
-          total={stats.active_run.senders_total}
-        />
-      )}
+      {/* Quick Actions */}
+      <Card className="animate-fade-in-up animate-delay-300">
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Tools to manage your inbox</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Link href="/dashboard/space">
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                    <HardDrive className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Free Up Space</div>
+                    <div className="text-xs text-muted-foreground">Delete large emails</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-      {/* Activity Feed */}
-      <ActivityFeed actions={actions} />
+            <Link href="/dashboard/settings">
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-green-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Protected Senders</div>
+                    <div className="text-xs text-muted-foreground">Manage whitelist</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/dashboard/history">
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium">History</div>
+                    <div className="text-xs text-muted-foreground">View past cleanups</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Last Cleanup Info */}
+      {stats?.last_run && (
+        <Card className="animate-fade-in-up animate-delay-400">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <div className="font-medium">Last Cleanup</div>
+                  <div className="text-sm text-muted-foreground">
+                    {formatDate(stats.last_run.finished_at || stats.last_run.started_at)} •{" "}
+                    {stats.last_run.emails_deleted} emails cleaned
+                  </div>
+                </div>
+              </div>
+              <Link href="/dashboard/history">
+                <Button variant="ghost" size="sm">
+                  View History
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

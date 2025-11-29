@@ -3,11 +3,11 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import useSWR from "swr"
-import { Trash2, Plus, Loader2, CheckCircle2 } from "lucide-react"
+import { Trash2, Plus, Loader2, CheckCircle2, Brain, Shield, User, Globe } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { api, WhitelistEntry, AuthStatus } from "@/lib/api"
+import { api, WhitelistEntry, AuthStatus, UserPreference, FeedbackStats } from "@/lib/api"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -15,6 +15,7 @@ export default function SettingsPage() {
   const [isAdding, setIsAdding] = useState(false)
   const [removingDomain, setRemovingDomain] = useState<string | null>(null)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
+  const [removingPreference, setRemovingPreference] = useState<number | null>(null)
 
   const { data: whitelist, mutate: mutateWhitelist } = useSWR<WhitelistEntry[]>(
     "/api/whitelist",
@@ -24,6 +25,16 @@ export default function SettingsPage() {
   const { data: authStatus } = useSWR<AuthStatus>(
     "/api/auth/status",
     () => api.getAuthStatus()
+  )
+
+  const { data: preferencesData, mutate: mutatePreferences } = useSWR<{ preferences: UserPreference[]; total: number }>(
+    "/api/feedback/preferences",
+    () => api.getLearnedPreferences()
+  )
+
+  const { data: feedbackStats } = useSWR<FeedbackStats>(
+    "/api/feedback/stats",
+    () => api.getFeedbackStats()
   )
 
   const handleAddDomain = async (e: React.FormEvent) => {
@@ -74,6 +85,34 @@ export default function SettingsPage() {
       alert("Failed to disconnect. Please try again.")
     } finally {
       setIsDisconnecting(false)
+    }
+  }
+
+  const handleDeletePreference = async (prefId: number) => {
+    if (!confirm("Are you sure you want to delete this learned preference?")) {
+      return
+    }
+
+    try {
+      setRemovingPreference(prefId)
+      await api.deletePreference(prefId)
+      mutatePreferences()
+    } catch (error) {
+      console.error("Failed to delete preference:", error)
+      alert("Failed to delete preference. Please try again.")
+    } finally {
+      setRemovingPreference(null)
+    }
+  }
+
+  const getPrefTypeIcon = (type: string) => {
+    switch (type) {
+      case "sender":
+        return <User className="h-4 w-4" />
+      case "domain":
+        return <Globe className="h-4 w-4" />
+      default:
+        return <Brain className="h-4 w-4" />
     }
   }
 
@@ -206,29 +245,80 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Aggressiveness Setting (Placeholder) */}
+      {/* Learned Preferences */}
       <Card>
         <CardHeader>
-          <CardTitle>Cleanup Aggressiveness</CardTitle>
-          <CardDescription>
-            Control how aggressive the AI agent should be when cleaning (Coming Soon)
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5" />
+                Learned Preferences
+              </CardTitle>
+              <CardDescription>
+                Preferences learned from your feedback to improve future scoring
+              </CardDescription>
+            </div>
+            {feedbackStats && (
+              <div className="text-right text-sm text-muted-foreground">
+                <div>{feedbackStats.total_feedback} total feedback</div>
+                <div>{feedbackStats.learned_preferences} preferences learned</div>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">Conservative</span>
-              <input
-                type="range"
-                min="1"
-                max="5"
-                defaultValue="3"
-                disabled
-                className="flex-1 opacity-50"
-              />
-              <span className="text-sm text-muted-foreground">Aggressive</span>
-            </div>
-            <Badge variant="secondary">Coming Soon</Badge>
+          <div className="space-y-2">
+            {!preferencesData ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : preferencesData.preferences.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No learned preferences yet. Override email classifications in the Score page to start learning.
+              </p>
+            ) : (
+              preferencesData.preferences.map((pref) => (
+                <div
+                  key={pref.id}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      {getPrefTypeIcon(pref.pref_type)}
+                      <span className="font-medium text-sm">{pref.pattern}</span>
+                      <Badge
+                        variant={pref.classification === "KEEP" ? "default" : "destructive"}
+                        className="text-xs"
+                      >
+                        {pref.classification === "KEEP" ? (
+                          <Shield className="h-3 w-3 mr-1" />
+                        ) : (
+                          <Trash2 className="h-3 w-3 mr-1" />
+                        )}
+                        {pref.classification}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                      <span>Type: {pref.pref_type}</span>
+                      <span>Confidence: {Math.round(pref.confidence * 100)}%</span>
+                      <span>Learned from {pref.feedback_count} feedback{pref.feedback_count !== 1 ? "s" : ""}</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeletePreference(pref.id)}
+                    disabled={removingPreference === pref.id}
+                  >
+                    {removingPreference === pref.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    )}
+                  </Button>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

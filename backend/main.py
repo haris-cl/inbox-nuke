@@ -121,7 +121,7 @@ async def root() -> dict[str, str]:
 
 
 # Import routers
-from routers import attachments, auth, exports, runs, senders, stats, whitelist
+from routers import attachments, auth, exports, runs, senders, stats, whitelist, retention, classification, subscriptions, scoring, feedback, cleanup
 
 # Include routers with prefixes
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
@@ -131,6 +131,14 @@ app.include_router(whitelist.router, prefix="/api/whitelist", tags=["Whitelist"]
 app.include_router(stats.router, prefix="/api/stats", tags=["Statistics"])
 app.include_router(exports.router, prefix="/api/exports", tags=["Exports"])
 app.include_router(attachments.router, prefix="/api/attachments", tags=["Attachments"])
+app.include_router(retention.router, prefix="/api/retention", tags=["Retention"])
+app.include_router(classification.router, prefix="/api/classification", tags=["Classification"])
+app.include_router(subscriptions.router, prefix="/api/subscriptions", tags=["Subscriptions"])
+app.include_router(scoring.router, prefix="/api/scoring", tags=["Scoring"])
+app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
+
+# V2 Cleanup Wizard Router
+app.include_router(cleanup.router, prefix="/api/cleanup", tags=["V2 Cleanup Wizard"])
 
 
 if __name__ == "__main__":

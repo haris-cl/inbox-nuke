@@ -229,3 +229,79 @@ Backend must return `{runs: [], total, limit, offset}` format, not raw array.
 
 ## Gmail API Scopes
 `openid`, `gmail.readonly`, `gmail.modify`, `gmail.settings.basic`, `gmail.send`, `userinfo.email`
+
+## Claude Code Workflow (IMPORTANT)
+
+When working on this project, Claude Code MUST follow these practices to prevent bugs:
+
+### End-to-End Verification (After Building Features)
+Before marking a feature complete, verify the full data flow:
+
+1. **Test API directly with curl:**
+   ```bash
+   # Check endpoint returns data
+   curl -s http://localhost:8000/api/[endpoint]
+
+   # Test POST operations
+   curl -s -X POST http://localhost:8000/api/[endpoint] -H "Content-Type: application/json" -d '{"key": "value"}'
+   ```
+
+2. **Verify database persistence:**
+   ```bash
+   # Check data was saved (follow up GET after POST)
+   curl -s http://localhost:8000/api/[endpoint]
+   ```
+
+3. **Test external API integration (Gmail):**
+   ```bash
+   # Start a scan/scoring operation
+   curl -s -X POST http://localhost:8000/api/scoring/start -H "Content-Type: application/json" -d '{"max_emails": 5}'
+
+   # Check progress
+   sleep 3 && curl -s http://localhost:8000/api/scoring/progress
+   ```
+
+4. **If something fails, trace the error:**
+   - Check if it's a parameter mismatch (wrong arguments to class/function)
+   - Check if async/await is missing
+   - Check if frontend types match backend response
+
+### After Modifying Backend Schemas (`schemas.py` or `models.py`)
+1. **Regenerate TypeScript types:**
+   ```bash
+   cd /Users/hnaeem/inbox-nuke/backend && source venv/bin/activate && cd .. && python scripts/generate-types.py
+   ```
+2. **If models.py changed, create a migration:**
+   ```bash
+   cd /Users/hnaeem/inbox-nuke/backend && source venv/bin/activate && alembic revision --autogenerate -m "Description"
+   ```
+
+### Before Saying "Done" on Any Task
+1. **Check for type errors (catches missing await):**
+   ```bash
+   cd /Users/hnaeem/inbox-nuke/backend && source venv/bin/activate && pyright 2>&1 | head -20
+   ```
+2. **Verify frontend/backend match:** If you modified an API endpoint or response format, check that `frontend/lib/api.ts` matches the backend schema.
+
+### Common Error Prevention Checklist
+| When You... | Do This |
+|-------------|---------|
+| Add new endpoint | Update `frontend/lib/api.ts` with correct URL and types |
+| Change response shape | Run `python scripts/generate-types.py` |
+| Add column to model | Run `alembic revision --autogenerate` |
+| Call async Gmail methods | Always use `await` (list_messages, get_message, get_thread_info) |
+| Leave TODO comment | Mark as `TODO CRITICAL` if it must be done before release |
+
+### Integration Points to Verify
+When changing code, verify these connection points match:
+1. **Backend schema ↔ Database model** (field names, types)
+2. **Backend response ↔ Frontend interface** (property names, optional vs required)
+3. **Frontend API call ↔ Backend endpoint** (URL path, HTTP method, request body)
+4. **Async function ↔ Caller** (await present when calling async methods)
+
+### Files That Must Stay In Sync
+| Backend File | Frontend File | Sync Method |
+|--------------|---------------|-------------|
+| `schemas.py` | `lib/api-types.ts` | Run `generate-types.py` |
+| `routers/*.py` endpoints | `lib/api.ts` | Manual update |
+| `models.py` | Database | Run `alembic` migration |

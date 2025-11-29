@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     # OpenAI Configuration (optional)
     OPENAI_API_KEY: Optional[str] = None
+    AI_CLASSIFICATION_ENABLED: bool = False
+    CLASSIFICATION_BATCH_SIZE: int = 50
 
     # Encryption Configuration
     ENCRYPTION_KEY: str = ""
